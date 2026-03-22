@@ -160,8 +160,10 @@ class PreferencesViewController: NSViewController {
             
             self.infoTextView.string = output.isEmpty ? "No paired devices found" : output
             
-            // Scroll to top to show the first devices
+            // Scroll to top and force layout update
             self.infoTextView.scrollRangeToVisible(NSRange(location: 0, length: 0))
+            self.infoTextView.needsDisplay = true
+            self.infoTextView.layoutManager?.ensureLayout(for: self.infoTextView.textContainer!)
         }
     }
     
