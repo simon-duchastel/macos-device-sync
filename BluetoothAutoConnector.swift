@@ -9,7 +9,6 @@ class BluetoothAutoConnector: NSObject {
     private var wasKeyboardConnected = false
     private var isTrackpadConnected = false
     
-    // Polling interval: always 2s for responsiveness
     private let pollingInterval: TimeInterval = 2.0
     
     var isMonitoring: Bool {
