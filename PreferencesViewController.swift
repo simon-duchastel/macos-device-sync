@@ -128,6 +128,14 @@ class PreferencesViewController: NSViewController {
         let field = NSTextField()
         field.placeholderString = placeholder
         field.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Enable copy/paste and selection
+        field.isSelectable = true
+        field.isEditable = true
+        
+        // Allow right-click context menu
+        field.allowsEditingTextAttributes = false
+        
         return field
     }
     
