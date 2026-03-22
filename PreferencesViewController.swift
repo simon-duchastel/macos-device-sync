@@ -6,10 +6,12 @@ class PreferencesViewController: NSViewController {
     
     var keyboardMACField: NSTextField!
     var trackpadMACField: NSTextField!
-    var infoTextView: NSTextView!
+    var tableView: NSTableView!
+    var scrollView: NSScrollView!
+    var pairedDevices: [IOBluetoothDevice] = []
     
     override func loadView() {
-        let view = NSView(frame: NSRect(x: 0, y: 0, width: 450, height: 300))
+        let view = NSView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
         self.view = view
     }
     
@@ -45,19 +47,42 @@ class PreferencesViewController: NSViewController {
         detectButton.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(detectButton)
         
-        infoTextView = NSTextView(frame: NSRect(x: 0, y: 0, width: 410, height: 80))
-        infoTextView.translatesAutoresizingMaskIntoConstraints = false
-        infoTextView.isEditable = false
-        infoTextView.font = NSFont.systemFont(ofSize: 11)
-        infoTextView.backgroundColor = NSColor.textBackgroundColor
-        infoTextView.autoresizingMask = [.width, .height]
-        infoTextView.minSize = NSSize(width: 0, height: 80)
-        infoTextView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-        let scrollView = NSScrollView()
+        // Create table view for paired devices
+        tableView = NSTableView()
+        tableView.translatesAutoresizingMaskIntoConstraints = false
+        tableView.dataSource = self
+        tableView.delegate = self
+        tableView.headerView = NSTableHeaderView()
+        tableView.columnAutoresizingStyle = .uniformColumnAutoresizingStyle
+        
+        // Add columns
+        let nameColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("name"))
+        nameColumn.title = "Name"
+        nameColumn.width = 250
+        nameColumn.minWidth = 150
+        nameColumn.maxWidth = 400
+        tableView.addTableColumn(nameColumn)
+
+        let addressColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("address"))
+        addressColumn.title = "MAC Address"
+        addressColumn.width = 140
+        addressColumn.minWidth = 120
+        addressColumn.maxWidth = 160
+        tableView.addTableColumn(addressColumn)
+
+        let statusColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("status"))
+        statusColumn.title = "Status"
+        statusColumn.width = 100
+        statusColumn.minWidth = 80
+        statusColumn.maxWidth = 120
+        tableView.addTableColumn(statusColumn)
+        
+        scrollView = NSScrollView()
         scrollView.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.documentView = infoTextView
+        scrollView.documentView = tableView
         scrollView.hasVerticalScroller = true
         scrollView.borderType = .bezelBorder
+        scrollView.autohidesScrollers = false
         view.addSubview(scrollView)
         
         NSLayoutConstraint.activate([
@@ -88,7 +113,7 @@ class PreferencesViewController: NSViewController {
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
             scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -20),
-            scrollView.heightAnchor.constraint(equalToConstant: 80)
+            scrollView.heightAnchor.constraint(equalToConstant: 100)
         ])
     }
     
@@ -145,28 +170,10 @@ class PreferencesViewController: NSViewController {
     }
     
     @objc func showPairedDevices() {
-        infoTextView.string = "Fetching paired devices..."
-        
-        // IOBluetooth must be accessed on main thread
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            
-            let pairedDevices = IOBluetoothDevice.pairedDevices() as? [IOBluetoothDevice] ?? []
-            
-            var output = ""
-            for device in pairedDevices {
-                let address = device.addressString ?? "Unknown"
-                let name = device.name ?? "Unknown"
-                let connected = device.isConnected() ? "connected" : "not connected"
-                output += "address: \(address), \(connected), name: \"\(name)\"\n"
-            }
-            
-            self.infoTextView.string = output.isEmpty ? "No paired devices found" : output
-            
-            // Scroll to top and force layout update
-            self.infoTextView.scrollRangeToVisible(NSRange(location: 0, length: 0))
-            self.infoTextView.needsDisplay = true
-            self.infoTextView.layoutManager?.ensureLayout(for: self.infoTextView.textContainer!)
+            self.pairedDevices = IOBluetoothDevice.pairedDevices() as? [IOBluetoothDevice] ?? []
+            self.tableView.reloadData()
         }
     }
     
@@ -175,5 +182,103 @@ class PreferencesViewController: NSViewController {
         alert.messageText = message
         alert.alertStyle = .informational
         alert.runModal()
+    }
+}
+
+extension PreferencesViewController: NSTableViewDataSource {
+    func numberOfRows(in tableView: NSTableView) -> Int {
+        return pairedDevices.count
+    }
+}
+
+extension PreferencesViewController: NSTableViewDelegate {
+    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+        guard row < pairedDevices.count, let column = tableColumn else { return nil }
+        
+        let device = pairedDevices[row]
+        let cellIdentifier = NSUserInterfaceItemIdentifier("Cell")
+        
+        var cell = tableView.makeView(withIdentifier: cellIdentifier, owner: nil) as? NSTableCellView
+        if cell == nil {
+            cell = NSTableCellView()
+            cell?.identifier = cellIdentifier
+            let textField = NSTextField()
+            textField.isEditable = false
+            textField.isSelectable = true
+            textField.isBordered = false
+            textField.backgroundColor = .clear
+            textField.usesSingleLineMode = true
+            textField.lineBreakMode = .byTruncatingTail
+            textField.translatesAutoresizingMaskIntoConstraints = false
+            cell?.addSubview(textField)
+            cell?.textField = textField
+            if let tf = cell?.textField {
+                NSLayoutConstraint.activate([
+                    tf.leadingAnchor.constraint(equalTo: cell!.leadingAnchor, constant: 4),
+                    tf.trailingAnchor.constraint(equalTo: cell!.trailingAnchor, constant: -4),
+                    tf.centerYAnchor.constraint(equalTo: cell!.centerYAnchor)
+                ])
+            }
+        }
+        
+        switch column.identifier.rawValue {
+        case "name":
+            cell?.textField?.stringValue = device.name ?? "Unknown"
+        case "address":
+            cell?.textField?.stringValue = device.addressString ?? "Unknown"
+        case "status":
+            let isConnected = device.isConnected()
+            cell?.textField?.stringValue = isConnected ? "Connected" : "Disconnected"
+            cell?.textField?.textColor = isConnected ? .systemGreen : .systemRed
+        default:
+            break
+        }
+        
+        return cell
+    }
+    
+    func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
+        return 20
+    }
+    
+    func tableViewSelectionDidChange(_ notification: Notification) {
+        if let tableView = notification.object as? NSTableView {
+            let row = tableView.selectedRow
+            let column = tableView.selectedColumn
+            
+            guard row >= 0, column >= 0 else { return }
+            
+            if let cellView = tableView.view(atColumn: column, row: row, makeIfNecessary: false) as? NSTableCellView,
+               let textField = cellView.textField {
+                self.view.window?.makeFirstResponder(textField)
+            }
+        }
+    }
+}
+
+extension PreferencesViewController {
+    @IBAction func copy(_ sender: Any?) {
+        guard tableView.clickedRow >= 0 else { return }
+        
+        let row = tableView.clickedRow
+        let column = tableView.clickedColumn
+        let device = pairedDevices[row]
+        var textToCopy = ""
+        
+        switch column {
+        case 0:
+            textToCopy = device.name ?? "Unknown"
+        case 1:
+            textToCopy = device.addressString ?? "Unknown"
+        case 2:
+            textToCopy = device.isConnected() ? "Connected" : "Disconnected"
+        default:
+            break
+        }
+        
+        if !textToCopy.isEmpty {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(textToCopy, forType: .string)
+        }
     }
 }
