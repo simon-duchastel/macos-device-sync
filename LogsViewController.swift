@@ -27,8 +27,16 @@ class LogsViewController: NSViewController {
         )
     }
     
+    var autoClearCheckbox: NSButton!
+    
     func setupUI() {
-        // Add button first
+        // Add auto-clear checkbox
+        autoClearCheckbox = NSButton(checkboxWithTitle: "Purge logs after 5 min", target: self, action: #selector(toggleAutoClear))
+        autoClearCheckbox.translatesAutoresizingMaskIntoConstraints = false
+        autoClearCheckbox.state = Logger.shared.autoClearEnabled ? .on : .off
+        view.addSubview(autoClearCheckbox)
+        
+        // Add clear button
         let clearButton = NSButton(title: "Clear", target: self, action: #selector(clearLogs))
         clearButton.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(clearButton)
@@ -51,22 +59,27 @@ class LogsViewController: NSViewController {
         scrollView.documentView = textView
         
         NSLayoutConstraint.activate([
-            clearButton.topAnchor.constraint(equalTo: view.topAnchor, constant: 8),
+            autoClearCheckbox.topAnchor.constraint(equalTo: view.topAnchor, constant: 8),
+            autoClearCheckbox.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
+            
+            clearButton.centerYAnchor.constraint(equalTo: autoClearCheckbox.centerYAnchor),
             clearButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
             clearButton.widthAnchor.constraint(equalToConstant: 80),
             
-            scrollView.topAnchor.constraint(equalTo: clearButton.bottomAnchor, constant: 8),
+            scrollView.topAnchor.constraint(equalTo: autoClearCheckbox.bottomAnchor, constant: 8),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
             scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -8)
         ])
     }
     
+    @objc func toggleAutoClear() {
+        Logger.shared.autoClearEnabled = (autoClearCheckbox.state == .on)
+        Logger.shared.log("Auto-clear logs: \(Logger.shared.autoClearEnabled ? "enabled" : "disabled")")
+    }
+    
     @objc func updateLogs() {
         textView?.string = Logger.shared.allLogs
-        if textView?.enclosingScrollView != nil {
-            textView?.scrollToEndOfDocument(nil)
-        }
     }
     
     @objc func clearLogs() {
