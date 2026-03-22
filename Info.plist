@@ -5,13 +5,11 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
     <key>CFBundleExecutable</key>
-    <string>BTAutoConnect</string>
+    <string>MacOsDeviceSync</string>
     <key>CFBundleIdentifier</key>
-    <string>com.yourname.btautoconnect</string>
-    <key>CFBundleInfoDictionaryVersion</key>
-    <string>6.0</string>
+    <string>com.yourname.macosdevicesync</string>
     <key>CFBundleName</key>
-    <string>BT AutoConnect</string>
+    <string>MacOsDeviceSync</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
