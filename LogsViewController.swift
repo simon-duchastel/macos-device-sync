@@ -99,11 +99,7 @@ class LogsViewController: NSViewController {
     
     @objc func updateLogs() {
         let wasAtBottom = isScrolledToBottom()
-        
-        // Use file logs if in-memory logs are empty (auto-cleared)
-        let logs = Logger.shared.allLogs
-        let fileLogs = Logger.shared.allLogsFromFile
-        textView?.string = logs.isEmpty && !fileLogs.isEmpty ? fileLogs : logs
+        textView?.string = Logger.shared.allLogs
         
         // Only autoscroll if user was already at the bottom
         if wasAtBottom {

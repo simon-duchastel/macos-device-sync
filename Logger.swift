@@ -109,15 +109,6 @@ class Logger {
         return result
     }
     
-    var allLogsFromFile: String {
-        guard let url = logFileURL,
-              FileManager.default.fileExists(atPath: url.path),
-              let content = try? String(contentsOf: url, encoding: .utf8) else {
-            return ""
-        }
-        return content.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-    
     private func purgeOldLogs() {
         let cutoffDate = Date().addingTimeInterval(-purgeAge)
         let originalCount = logEntries.count

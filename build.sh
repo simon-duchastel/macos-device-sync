@@ -27,13 +27,6 @@ swiftc \
     *.swift
 
 cp "Info.plist" "$CONTENTS_DIR/Info.plist"
-
-# Apply entitlements (required for IOBluetooth to work)
-if [ -f "MacOsDeviceSync.entitlements" ]; then
-    echo "Applying entitlements..."
-    codesign --force --deep --entitlements MacOsDeviceSync.entitlements --sign - "$BUILD_DIR/$APP_NAME.app"
-fi
-
 chmod +x "$MACOS_DIR/$APP_NAME"
 
 echo "Built: $BUILD_DIR/$APP_NAME.app"
