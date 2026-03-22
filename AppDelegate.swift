@@ -23,9 +23,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if connector.keyboardMAC != nil && connector.trackpadMAC != nil {
             Logger.shared.log("Auto-starting monitoring...")
             connector.startMonitoring()
-            updateMenuStatus()
+            updateMenuStatus(isRunning: true)
         } else {
             Logger.shared.log("Please configure devices in Preferences to start monitoring")
+            updateMenuStatus(isRunning: false)
         }
         
         Logger.shared.log("App started successfully")
@@ -64,9 +65,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         
-        connector.startMonitoring()
-        updateMenuStatus()
-        Logger.shared.log("Monitoring started")
+        if connector.isMonitoring {
+            connector.stopMonitoring()
+            updateMenuStatus(isRunning: false)
+            Logger.shared.log("Monitoring stopped")
+        } else {
+            connector.startMonitoring()
+            updateMenuStatus(isRunning: true)
+            Logger.shared.log("Monitoring started")
+        }
     }
     
     @objc func showPreferences() {
@@ -107,15 +114,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         connector.trackpadMAC = defaults.string(forKey: "trackpadMAC")
     }
     
-    func updateMenuStatus() {
+    func updateMenuStatus(isRunning: Bool? = nil) {
         guard let menu = statusItem.menu else { return }
         
+        let running = isRunning ?? connector.isMonitoring
+        
         if let statusItem = menu.item(withTag: 100) {
-            statusItem.title = "Status: Running"
+            let title = running ? "Status: Running" : "Status: Stopped"
+            let color = running ? NSColor.systemGreen : NSColor.systemRed
+            
+            let attributes: [NSAttributedString.Key: Any] = [
+                .foregroundColor: color
+            ]
+            statusItem.attributedTitle = NSAttributedString(string: title, attributes: attributes)
         }
         
         if let startStopItem = menu.item(withTag: 101) {
-            startStopItem.title = "Restart Monitoring"
+            startStopItem.title = running ? "Stop Monitoring" : "Start Monitoring"
         }
     }
     

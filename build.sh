@@ -2,9 +2,9 @@
 
 set -e
 
-echo "Building BT AutoConnect..."
+echo "Building MacOsDeviceSync..."
 
-APP_NAME="BTAutoConnect"
+APP_NAME="MacOsDeviceSync"
 BUILD_DIR="build"
 CONTENTS_DIR="$BUILD_DIR/$APP_NAME.app/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"

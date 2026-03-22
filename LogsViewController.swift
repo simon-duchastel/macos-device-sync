@@ -2,6 +2,7 @@ import Cocoa
 
 class LogsViewController: NSViewController {
     var textView: NSTextView!
+    var scrollView: NSScrollView!
     
     override func loadView() {
         let view = NSView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
@@ -27,14 +28,22 @@ class LogsViewController: NSViewController {
         )
     }
     
+    var autoClearCheckbox: NSButton!
+    
     func setupUI() {
-        // Add button first
+        // Add auto-clear checkbox
+        autoClearCheckbox = NSButton(checkboxWithTitle: "Purge logs after 5 min", target: self, action: #selector(toggleAutoClear))
+        autoClearCheckbox.translatesAutoresizingMaskIntoConstraints = false
+        autoClearCheckbox.state = Logger.shared.autoClearEnabled ? .on : .off
+        view.addSubview(autoClearCheckbox)
+        
+        // Add clear button
         let clearButton = NSButton(title: "Clear", target: self, action: #selector(clearLogs))
         clearButton.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(clearButton)
         
         // Setup scroll view
-        let scrollView = NSScrollView()
+        scrollView = NSScrollView()
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = true
@@ -51,20 +60,49 @@ class LogsViewController: NSViewController {
         scrollView.documentView = textView
         
         NSLayoutConstraint.activate([
-            clearButton.topAnchor.constraint(equalTo: view.topAnchor, constant: 8),
+            autoClearCheckbox.topAnchor.constraint(equalTo: view.topAnchor, constant: 8),
+            autoClearCheckbox.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
+            
+            clearButton.centerYAnchor.constraint(equalTo: autoClearCheckbox.centerYAnchor),
             clearButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
             clearButton.widthAnchor.constraint(equalToConstant: 80),
             
-            scrollView.topAnchor.constraint(equalTo: clearButton.bottomAnchor, constant: 8),
+            scrollView.topAnchor.constraint(equalTo: autoClearCheckbox.bottomAnchor, constant: 8),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
             scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -8)
         ])
     }
     
+    func isScrolledToBottom() -> Bool {
+        guard let scrollView = scrollView else { return true }
+        
+        let contentView = scrollView.contentView
+        let documentView = contentView.documentView
+        
+        guard let docView = documentView else { return true }
+        
+        let visibleRect = contentView.bounds
+        let documentHeight = docView.frame.height
+        let visibleHeight = visibleRect.height
+        let scrollPosition = visibleRect.origin.y
+        
+        // Consider "at bottom" if within 10 points of the bottom
+        let distanceFromBottom = documentHeight - (scrollPosition + visibleHeight)
+        return distanceFromBottom <= 10
+    }
+    
+    @objc func toggleAutoClear() {
+        Logger.shared.autoClearEnabled = (autoClearCheckbox.state == .on)
+        Logger.shared.log("Auto-clear logs: \(Logger.shared.autoClearEnabled ? "enabled" : "disabled")")
+    }
+    
     @objc func updateLogs() {
+        let wasAtBottom = isScrolledToBottom()
         textView?.string = Logger.shared.allLogs
-        if textView?.enclosingScrollView != nil {
+        
+        // Only autoscroll if user was already at the bottom
+        if wasAtBottom {
             textView?.scrollToEndOfDocument(nil)
         }
     }
