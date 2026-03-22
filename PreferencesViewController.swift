@@ -153,15 +153,39 @@ class PreferencesViewController: NSViewController {
             
             let pairedDevices = IOBluetoothDevice.pairedDevices() as? [IOBluetoothDevice] ?? []
             
-            var output = ""
+            guard !pairedDevices.isEmpty else {
+                self.infoTextView.string = "No paired devices found"
+                return
+            }
+            
+            // Build formatted table
+            var lines: [(name: String, address: String, status: String)] = []
             for device in pairedDevices {
                 let address = device.addressString ?? "Unknown"
                 let name = device.name ?? "Unknown"
-                let connected = device.isConnected() ? "connected" : "not connected"
-                output += "address: \(address), \(connected), name: \"\(name)\"\n"
+                let status = device.isConnected() ? "✓ Connected" : "○ Disconnected"
+                lines.append((name: name, address: address, status: status))
             }
             
-            self.infoTextView.string = output.isEmpty ? "No paired devices found" : output
+            // Calculate column widths
+            let maxNameWidth = max(10, lines.map { $0.name.count }.max() ?? 10)
+            let maxAddrWidth = max(17, lines.map { $0.address.count }.max() ?? 17)
+            
+            // Build formatted output
+            var output = ""
+            output += String(format: "%-*s  %-*s  %s\n", maxNameWidth, "Name", maxAddrWidth, "MAC Address", "Status")
+            output += String(repeating: "-", count: maxNameWidth) + "  "
+            output += String(repeating: "-", count: maxAddrWidth) + "  "
+            output += String(repeating: "-", count: 12) + "\n"
+            
+            for line in lines {
+                output += String(format: "%-*@  %-*@  %@\n", 
+                    maxNameWidth, line.name,
+                    maxAddrWidth, line.address,
+                    line.status)
+            }
+            
+            self.infoTextView.string = output
             
             // Scroll to top and force layout update
             self.infoTextView.scrollRangeToVisible(NSRange(location: 0, length: 0))
