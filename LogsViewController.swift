@@ -80,7 +80,6 @@ class LogsViewController: NSViewController {
     
     @objc func updateLogs() {
         textView?.string = Logger.shared.allLogs
-        // Note: No autoscroll - user controls view position
     }
     
     @objc func clearLogs() {
