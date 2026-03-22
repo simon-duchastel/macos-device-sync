@@ -45,11 +45,14 @@ class PreferencesViewController: NSViewController {
         detectButton.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(detectButton)
         
-        infoTextView = NSTextView()
+        infoTextView = NSTextView(frame: NSRect(x: 0, y: 0, width: 410, height: 80))
         infoTextView.translatesAutoresizingMaskIntoConstraints = false
         infoTextView.isEditable = false
         infoTextView.font = NSFont.systemFont(ofSize: 11)
         infoTextView.backgroundColor = NSColor.textBackgroundColor
+        infoTextView.autoresizingMask = [.width, .height]
+        infoTextView.minSize = NSSize(width: 0, height: 80)
+        infoTextView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         let scrollView = NSScrollView()
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.documentView = infoTextView
@@ -144,8 +147,10 @@ class PreferencesViewController: NSViewController {
     @objc func showPairedDevices() {
         infoTextView.string = "Fetching paired devices..."
         
-        // Use native IOBluetooth API instead of blueutil
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+        // IOBluetooth must be accessed on main thread
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
             let pairedDevices = IOBluetoothDevice.pairedDevices() as? [IOBluetoothDevice] ?? []
             
             var output = ""
@@ -156,9 +161,12 @@ class PreferencesViewController: NSViewController {
                 output += "address: \(address), \(connected), name: \"\(name)\"\n"
             }
             
-            DispatchQueue.main.async {
-                self?.infoTextView.string = output.isEmpty ? "No paired devices found" : output
-            }
+            self.infoTextView.string = output.isEmpty ? "No paired devices found" : output
+            
+            // Scroll to top and force layout update
+            self.infoTextView.scrollRangeToVisible(NSRange(location: 0, length: 0))
+            self.infoTextView.needsDisplay = true
+            self.infoTextView.layoutManager?.ensureLayout(for: self.infoTextView.textContainer!)
         }
     }
     
