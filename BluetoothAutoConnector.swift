@@ -121,32 +121,56 @@ class BluetoothAutoConnector: NSObject {
             if normalizeMAC(device.addressString) == normalizedMAC {
                 Logger.shared.log("Found trackpad: \(device.name ?? "Unknown"), attempting connection...")
                 
-                // Attempt connection
-                let result = device.openConnection()
-                
-                if result == kIOReturnSuccess {
-                    // Verify connection
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-                        guard let self = self else { return }
-                        
-                        if device.isConnected() {
-                            Logger.shared.log("SUCCESS: Trackpad connected")
-                            self.delegate?.trackpadConnectedSuccessfully()
-                        } else {
-                            Logger.shared.log("FAILED: Trackpad connection attempt completed but not connected")
-                            self.delegate?.trackpadConnectionFailed()
-                        }
-                    }
-                } else {
-                    Logger.shared.log("FAILED: Could not open connection (error: \(result))")
-                    delegate?.trackpadConnectionFailed()
+                // Check if already connected
+                if device.isConnected() {
+                    Logger.shared.log("Trackpad already connected")
+                    delegate?.trackpadConnectedSuccessfully()
+                    return
                 }
+                
+                // Attempt connection with retry
+                attemptConnection(to: device, retryCount: 3)
                 return
             }
         }
         
         Logger.shared.log("ERROR: Trackpad not found in paired devices")
         delegate?.trackpadConnectionFailed()
+    }
+    
+    private func attemptConnection(to device: IOBluetoothDevice, retryCount: Int) {
+        guard retryCount > 0 else {
+            Logger.shared.log("FAILED: Exhausted all connection retries")
+            delegate?.trackpadConnectionFailed()
+            return
+        }
+        
+        Logger.shared.log("Connection attempt \(4 - retryCount)/3...")
+        let result = device.openConnection()
+        
+        if result == kIOReturnSuccess {
+            // Verify connection after delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                guard let self = self else { return }
+                
+                if device.isConnected() {
+                    Logger.shared.log("SUCCESS: Trackpad connected")
+                    self.delegate?.trackpadConnectedSuccessfully()
+                } else {
+                    Logger.shared.log("Connection pending, retrying...")
+                    self.attemptConnection(to: device, retryCount: retryCount - 1)
+                }
+            }
+        } else if result == -536870186 {
+            // kIOReturnNotPermitted - device busy or not ready
+            Logger.shared.log("Device busy (error: \(result)), will retry in 2s...")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                self?.attemptConnection(to: device, retryCount: retryCount - 1)
+            }
+        } else {
+            Logger.shared.log("FAILED: Could not open connection (error: \(result))")
+            delegate?.trackpadConnectionFailed()
+        }
     }
     
     private func normalizeMAC(_ mac: String) -> String {
