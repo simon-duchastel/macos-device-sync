@@ -23,10 +23,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if connector.keyboardMAC != nil && connector.trackpadMAC != nil {
             Logger.shared.log("Auto-starting monitoring...")
             connector.startMonitoring()
-            updateMenuStatus(running: true)
+            updateMenuStatus(isRunning: true)
         } else {
             Logger.shared.log("Please configure devices in Preferences to start monitoring")
-            updateMenuStatus(running: false)
+            updateMenuStatus(isRunning: false)
         }
         
         Logger.shared.log("App started successfully")
