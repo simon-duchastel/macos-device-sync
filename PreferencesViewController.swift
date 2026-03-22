@@ -173,16 +173,16 @@ class PreferencesViewController: NSViewController {
             
             // Build formatted output
             var output = ""
-            output += String(format: "%-*s  %-*s  %s\n", maxNameWidth, "Name", maxAddrWidth, "MAC Address", "Status")
+            output += String(format: "%-*@  %-*@  %@\n", maxNameWidth, "Name" as NSString, maxAddrWidth, "MAC Address" as NSString, "Status" as NSString)
             output += String(repeating: "-", count: maxNameWidth) + "  "
             output += String(repeating: "-", count: maxAddrWidth) + "  "
             output += String(repeating: "-", count: 12) + "\n"
-            
+
             for line in lines {
-                output += String(format: "%-*@  %-*@  %@\n", 
-                    maxNameWidth, line.name,
-                    maxAddrWidth, line.address,
-                    line.status)
+                output += String(format: "%-*@  %-*@  %@\n",
+                    maxNameWidth, line.name as NSString,
+                    maxAddrWidth, line.address as NSString,
+                    line.status as NSString)
             }
             
             self.infoTextView.string = output
