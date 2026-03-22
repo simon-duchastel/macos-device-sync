@@ -1,6 +1,6 @@
-# Device Sync
+# MacOsDeviceSync
 
-A macOS menu bar app that automatically connects your Bluetooth trackpad when a specific bluetooth keyboard is plugged in. 
+A macOS menu bar app that automatically connects your Bluetooth trackpad when a specific Bluetooth keyboard is connected. 
 
 ## Requirements
 
@@ -11,7 +11,7 @@ A macOS menu bar app that automatically connects your Bluetooth trackpad when a 
 
 ```bash
 ./build.sh
-open build/BTAutoConnect.app
+open build/MacOsDeviceSync.app
 ```
 
 ## Setup

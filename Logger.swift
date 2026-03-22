@@ -10,7 +10,7 @@ class Logger {
         // Setup file logging
         let fm = FileManager.default
         if let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
-            let dir = appSupport.appendingPathComponent("BTAutoConnect", isDirectory: true)
+            let dir = appSupport.appendingPathComponent("MacOsDeviceSync", isDirectory: true)
             try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
             logFileURL = dir.appendingPathComponent("debug.log")
         } else {

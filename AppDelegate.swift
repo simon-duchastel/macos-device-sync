@@ -65,9 +65,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         
-        connector.startMonitoring()
-        updateMenuStatus()
-        Logger.shared.log("Monitoring started")
+        if connector.isMonitoring {
+            connector.stopMonitoring()
+            updateMenuStatus(isRunning: false)
+            Logger.shared.log("Monitoring stopped")
+        } else {
+            connector.startMonitoring()
+            updateMenuStatus(isRunning: true)
+            Logger.shared.log("Monitoring started")
+        }
     }
     
     @objc func showPreferences() {
@@ -108,14 +114,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         connector.trackpadMAC = defaults.string(forKey: "trackpadMAC")
     }
     
-    func updateMenuStatus(running: Bool? = nil) {
+    func updateMenuStatus(isRunning: Bool? = nil) {
         guard let menu = statusItem.menu else { return }
         
-        let isRunning = running ?? connector.isMonitoring
+        let running = isRunning ?? connector.isMonitoring
         
         if let statusItem = menu.item(withTag: 100) {
-            let title = isRunning ? "Status: Running" : "Status: Stopped"
-            let color = isRunning ? NSColor.systemGreen : NSColor.systemRed
+            let title = running ? "Status: Running" : "Status: Stopped"
+            let color = running ? NSColor.systemGreen : NSColor.systemRed
             
             let attributes: [NSAttributedString.Key: Any] = [
                 .foregroundColor: color
@@ -124,7 +130,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         if let startStopItem = menu.item(withTag: 101) {
-            startStopItem.title = isRunning ? "Restart Monitoring" : "Start Monitoring"
+            startStopItem.title = running ? "Stop Monitoring" : "Start Monitoring"
         }
     }
     
