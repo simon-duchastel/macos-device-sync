@@ -7,6 +7,11 @@ class BluetoothAutoConnector: NSObject {
     
     private var timer: Timer?
     private var wasKeyboardConnected = false
+    private var isTrackpadConnected = false
+    
+    // Polling intervals: fast when waiting for keyboard, slow when both connected
+    private let fastInterval: TimeInterval = 2.0
+    private let slowInterval: TimeInterval = 30.0
     
     var isMonitoring: Bool {
         return timer != nil
@@ -24,7 +29,8 @@ class BluetoothAutoConnector: NSObject {
         timer?.invalidate()
         
         wasKeyboardConnected = false
-        timer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+        isTrackpadConnected = false
+        timer = Timer.scheduledTimer(withTimeInterval: fastInterval, repeats: true) { [weak self] _ in
             self?.checkConnectionStatus()
         }
         
@@ -53,27 +59,47 @@ class BluetoothAutoConnector: NSObject {
         let normalizedTarget = normalizeMAC(keyboardMAC)
         Logger.shared.log("Looking for keyboard: \(normalizedTarget)")
         
-        var isConnected = false
+        var isKeyboardConnected = false
+        var isTrackpadCurrentlyConnected = false
         let pairedDevices = IOBluetoothDevice.pairedDevices() as? [IOBluetoothDevice] ?? []
         
         Logger.shared.log("Found \(pairedDevices.count) paired devices")
         
         for device in pairedDevices {
-            if normalizeMAC(device.addressString) == normalizedTarget {
-                isConnected = device.isConnected()
-                Logger.shared.log("Found keyboard: \(device.name ?? "Unknown") - connected: \(isConnected)")
-                break
+            let normalizedAddress = normalizeMAC(device.addressString)
+            if normalizedAddress == normalizedTarget {
+                isKeyboardConnected = device.isConnected()
+                Logger.shared.log("Found keyboard: \(device.name ?? "Unknown") - connected: \(isKeyboardConnected)")
+            }
+            if let trackpadMAC = trackpadMAC, normalizedAddress == normalizeMAC(trackpadMAC) {
+                isTrackpadCurrentlyConnected = device.isConnected()
             }
         }
         
-        Logger.shared.log("Keyboard connected: \(isConnected) (was: \(wasKeyboardConnected))")
+        isTrackpadConnected = isTrackpadCurrentlyConnected
         
-        if isConnected && !wasKeyboardConnected {
+        // Adjust polling interval: slow down when both are connected
+        let shouldUseSlowPolling = isKeyboardConnected && isTrackpadConnected
+        let currentInterval = timer?.timeInterval ?? fastInterval
+        let targetInterval = shouldUseSlowPolling ? slowInterval : fastInterval
+        
+        if currentInterval != targetInterval {
+            Logger.shared.log("Adjusting polling interval from \(currentInterval)s to \(targetInterval)s")
+            timer?.invalidate()
+            timer = Timer.scheduledTimer(withTimeInterval: targetInterval, repeats: true) { [weak self] _ in
+                self?.checkConnectionStatus()
+            }
+            RunLoop.current.add(timer!, forMode: .common)
+        }
+        
+        Logger.shared.log("Keyboard connected: \(isKeyboardConnected) (was: \(wasKeyboardConnected)), Trackpad connected: \(isTrackpadConnected)")
+        
+        if isKeyboardConnected && !wasKeyboardConnected {
             wasKeyboardConnected = true
             Logger.shared.log("EVENT: Keyboard connected - triggering trackpad connection")
             delegate?.keyboardDidConnect()
             connectTrackpad()
-        } else if !isConnected && wasKeyboardConnected {
+        } else if !isKeyboardConnected && wasKeyboardConnected {
             wasKeyboardConnected = false
             Logger.shared.log("EVENT: Keyboard disconnected")
         }
