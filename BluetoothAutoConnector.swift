@@ -4,6 +4,15 @@ import IOBluetooth
 class BluetoothAutoConnector: NSObject {
     var keyboardMAC: String?
     var trackpadMAC: String?
+    var autoDisconnectTrackpad: Bool {
+        get {
+            // Default to true if not set
+            return UserDefaults.standard.object(forKey: "autoDisconnectTrackpad") as? Bool ?? true
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "autoDisconnectTrackpad")
+        }
+    }
     
     private var timer: Timer?
     private var wasKeyboardConnected = false
@@ -85,9 +94,13 @@ class BluetoothAutoConnector: NSObject {
             connectTrackpad()
         } else if !isKeyboardConnected && wasKeyboardConnected {
             wasKeyboardConnected = false
-            Logger.shared.log("EVENT: Keyboard disconnected - triggering trackpad disconnection")
-            delegate?.keyboardDidDisconnect()
-            disconnectTrackpad()
+            if autoDisconnectTrackpad {
+                Logger.shared.log("EVENT: Keyboard disconnected - triggering trackpad disconnection")
+                delegate?.keyboardDidDisconnect()
+                disconnectTrackpad()
+            } else {
+                Logger.shared.log("EVENT: Keyboard disconnected - auto-disconnect disabled, trackpad will stay connected")
+            }
         }
     }
     
