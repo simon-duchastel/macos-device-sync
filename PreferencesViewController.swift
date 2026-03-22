@@ -45,11 +45,14 @@ class PreferencesViewController: NSViewController {
         detectButton.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(detectButton)
         
-        infoTextView = NSTextView()
+        infoTextView = NSTextView(frame: NSRect(x: 0, y: 0, width: 410, height: 80))
         infoTextView.translatesAutoresizingMaskIntoConstraints = false
         infoTextView.isEditable = false
         infoTextView.font = NSFont.systemFont(ofSize: 11)
         infoTextView.backgroundColor = NSColor.textBackgroundColor
+        infoTextView.autoresizingMask = [.width, .height]
+        infoTextView.minSize = NSSize(width: 0, height: 80)
+        infoTextView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         let scrollView = NSScrollView()
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.documentView = infoTextView
