@@ -23,9 +23,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if connector.keyboardMAC != nil && connector.trackpadMAC != nil {
             Logger.shared.log("Auto-starting monitoring...")
             connector.startMonitoring()
-            updateMenuStatus()
+            updateMenuStatus(running: true)
         } else {
             Logger.shared.log("Please configure devices in Preferences to start monitoring")
+            updateMenuStatus(running: false)
         }
         
         Logger.shared.log("App started successfully")
@@ -107,15 +108,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         connector.trackpadMAC = defaults.string(forKey: "trackpadMAC")
     }
     
-    func updateMenuStatus() {
+    func updateMenuStatus(running: Bool? = nil) {
         guard let menu = statusItem.menu else { return }
         
+        let isRunning = running ?? connector.isMonitoring
+        
         if let statusItem = menu.item(withTag: 100) {
-            statusItem.title = "Status: Running"
+            let title = isRunning ? "Status: Running" : "Status: Stopped"
+            let color = isRunning ? NSColor.systemGreen : NSColor.systemRed
+            
+            let attributes: [NSAttributedString.Key: Any] = [
+                .foregroundColor: color
+            ]
+            statusItem.attributedTitle = NSAttributedString(string: title, attributes: attributes)
         }
         
         if let startStopItem = menu.item(withTag: 101) {
-            startStopItem.title = "Restart Monitoring"
+            startStopItem.title = isRunning ? "Restart Monitoring" : "Start Monitoring"
         }
     }
     

@@ -7,6 +7,10 @@ class BluetoothAutoConnector: NSObject {
     private var timer: Timer?
     private var wasKeyboardConnected = false
     
+    var isMonitoring: Bool {
+        return timer != nil
+    }
+    
     weak var delegate: BluetoothAutoConnectorDelegate?
     
     func startMonitoring() {
