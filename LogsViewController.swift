@@ -2,6 +2,7 @@ import Cocoa
 
 class LogsViewController: NSViewController {
     var textView: NSTextView!
+    var scrollView: NSScrollView!
     
     override func loadView() {
         let view = NSView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
@@ -42,7 +43,7 @@ class LogsViewController: NSViewController {
         view.addSubview(clearButton)
         
         // Setup scroll view
-        let scrollView = NSScrollView()
+        scrollView = NSScrollView()
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = true
@@ -73,13 +74,37 @@ class LogsViewController: NSViewController {
         ])
     }
     
+    func isScrolledToBottom() -> Bool {
+        guard let scrollView = scrollView else { return true }
+        
+        let contentView = scrollView.contentView
+        let documentView = contentView.documentView
+        
+        guard let docView = documentView else { return true }
+        
+        let visibleRect = contentView.bounds
+        let documentHeight = docView.frame.height
+        let visibleHeight = visibleRect.height
+        let scrollPosition = visibleRect.origin.y
+        
+        // Consider "at bottom" if within 10 points of the bottom
+        let distanceFromBottom = documentHeight - (scrollPosition + visibleHeight)
+        return distanceFromBottom <= 10
+    }
+    
     @objc func toggleAutoClear() {
         Logger.shared.autoClearEnabled = (autoClearCheckbox.state == .on)
         Logger.shared.log("Auto-clear logs: \(Logger.shared.autoClearEnabled ? "enabled" : "disabled")")
     }
     
     @objc func updateLogs() {
+        let wasAtBottom = isScrolledToBottom()
         textView?.string = Logger.shared.allLogs
+        
+        // Only autoscroll if user was already at the bottom
+        if wasAtBottom {
+            textView?.scrollToEndOfDocument(nil)
+        }
     }
     
     @objc func clearLogs() {
