@@ -6,6 +6,7 @@ class PreferencesViewController: NSViewController {
     
     var keyboardMACField: NSTextField!
     var trackpadMACField: NSTextField!
+    var autoDisconnectCheckbox: NSButton!
     var tableView: NSTableView!
     var scrollView: NSScrollView!
     var pairedDevices: [IOBluetoothDevice] = []
@@ -38,6 +39,11 @@ class PreferencesViewController: NSViewController {
         
         trackpadMACField = createTextField(placeholder: "XX-XX-XX-XX-XX-XX")
         view.addSubview(trackpadMACField)
+        
+        autoDisconnectCheckbox = NSButton(checkboxWithTitle: "Auto-disconnect trackpad when keyboard disconnects", target: nil, action: nil)
+        autoDisconnectCheckbox.translatesAutoresizingMaskIntoConstraints = false
+        autoDisconnectCheckbox.state = .on
+        view.addSubview(autoDisconnectCheckbox)
         
         let saveButton = NSButton(title: "Save & Start", target: self, action: #selector(saveSettings))
         saveButton.translatesAutoresizingMaskIntoConstraints = false
@@ -103,7 +109,10 @@ class PreferencesViewController: NSViewController {
             trackpadMACField.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             trackpadMACField.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
             
-            saveButton.topAnchor.constraint(equalTo: trackpadMACField.bottomAnchor, constant: 20),
+            autoDisconnectCheckbox.topAnchor.constraint(equalTo: trackpadMACField.bottomAnchor, constant: 12),
+            autoDisconnectCheckbox.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            
+            saveButton.topAnchor.constraint(equalTo: autoDisconnectCheckbox.bottomAnchor, constant: 20),
             saveButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             
             detectButton.topAnchor.constraint(equalTo: saveButton.bottomAnchor, constant: 12),
@@ -143,6 +152,11 @@ class PreferencesViewController: NSViewController {
         let defaults = UserDefaults.standard
         keyboardMACField.stringValue = defaults.string(forKey: "keyboardMAC") ?? ""
         trackpadMACField.stringValue = defaults.string(forKey: "trackpadMAC") ?? ""
+        // Default to ON (true) if not set
+        autoDisconnectCheckbox.state = defaults.bool(forKey: "autoDisconnectTrackpad") ? .on : .off
+        if defaults.object(forKey: "autoDisconnectTrackpad") == nil {
+            autoDisconnectCheckbox.state = .on
+        }
     }
     
     @objc func saveSettings() {
@@ -162,6 +176,7 @@ class PreferencesViewController: NSViewController {
         let defaults = UserDefaults.standard
         defaults.set(keyboardMAC, forKey: "keyboardMAC")
         defaults.set(trackpadMAC, forKey: "trackpadMAC")
+        defaults.set(autoDisconnectCheckbox.state == .on, forKey: "autoDisconnectTrackpad")
         
         connector.keyboardMAC = keyboardMAC
         connector.trackpadMAC = trackpadMAC

@@ -181,6 +181,13 @@ extension AppDelegate: BluetoothAutoConnectorDelegate {
         }
     }
     
+    func keyboardDidDisconnect() {
+        DispatchQueue.main.async {
+            Logger.shared.log("Keyboard disconnected - attempting trackpad disconnection")
+            self.showNotification(title: "Keyboard Disconnected", body: "Disconnecting trackpad...")
+        }
+    }
+    
     func trackpadConnectedSuccessfully() {
         DispatchQueue.main.async {
             Logger.shared.log("Trackpad connected successfully")
@@ -192,6 +199,20 @@ extension AppDelegate: BluetoothAutoConnectorDelegate {
         DispatchQueue.main.async {
             Logger.shared.log("Trackpad connection failed")
             self.showNotification(title: "Connection Failed", body: "Could not connect to trackpad.")
+        }
+    }
+    
+    func trackpadDisconnectedSuccessfully() {
+        DispatchQueue.main.async {
+            Logger.shared.log("Trackpad disconnected successfully")
+            self.showNotification(title: "Trackpad Disconnected", body: "Successfully disconnected trackpad!")
+        }
+    }
+    
+    func trackpadDisconnectionFailed() {
+        DispatchQueue.main.async {
+            Logger.shared.log("Trackpad disconnection failed")
+            self.showNotification(title: "Disconnection Failed", body: "Could not disconnect trackpad.")
         }
     }
     
