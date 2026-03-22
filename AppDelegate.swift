@@ -64,9 +64,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         
-        connector.startMonitoring()
-        updateMenuStatus()
-        Logger.shared.log("Monitoring started")
+        if connector.isMonitoring {
+            connector.stopMonitoring()
+            updateMenuStatus(isRunning: false)
+            Logger.shared.log("Monitoring stopped")
+        } else {
+            connector.startMonitoring()
+            updateMenuStatus(isRunning: true)
+            Logger.shared.log("Monitoring started")
+        }
     }
     
     @objc func showPreferences() {
@@ -107,15 +113,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         connector.trackpadMAC = defaults.string(forKey: "trackpadMAC")
     }
     
-    func updateMenuStatus() {
+    func updateMenuStatus(isRunning: Bool? = nil) {
         guard let menu = statusItem.menu else { return }
         
+        let running = isRunning ?? connector.isMonitoring
+        
         if let statusItem = menu.item(withTag: 100) {
-            statusItem.title = "Status: Running"
+            statusItem.title = running ? "Status: Running" : "Status: Stopped"
         }
         
         if let startStopItem = menu.item(withTag: 101) {
-            startStopItem.title = "Restart Monitoring"
+            startStopItem.title = running ? "Stop Monitoring" : "Start Monitoring"
         }
     }
     
