@@ -9,9 +9,8 @@ class BluetoothAutoConnector: NSObject {
     private var wasKeyboardConnected = false
     private var isTrackpadConnected = false
     
-    // Polling intervals: fast when waiting for keyboard, slow when both connected
-    private let fastInterval: TimeInterval = 2.0
-    private let slowInterval: TimeInterval = 30.0
+    // Polling interval: always 2s for responsiveness
+    private let pollingInterval: TimeInterval = 2.0
     
     var isMonitoring: Bool {
         return timer != nil
@@ -30,7 +29,7 @@ class BluetoothAutoConnector: NSObject {
         
         wasKeyboardConnected = false
         isTrackpadConnected = false
-        timer = Timer.scheduledTimer(withTimeInterval: fastInterval, repeats: true) { [weak self] _ in
+        timer = Timer.scheduledTimer(withTimeInterval: pollingInterval, repeats: true) { [weak self] _ in
             self?.checkConnectionStatus()
         }
         
@@ -78,20 +77,6 @@ class BluetoothAutoConnector: NSObject {
         
         isTrackpadConnected = isTrackpadCurrentlyConnected
         
-        // Adjust polling interval: slow down when both are connected
-        let shouldUseSlowPolling = isKeyboardConnected && isTrackpadConnected
-        let currentInterval = timer?.timeInterval ?? fastInterval
-        let targetInterval = shouldUseSlowPolling ? slowInterval : fastInterval
-        
-        if currentInterval != targetInterval {
-            Logger.shared.log("Adjusting polling interval from \(currentInterval)s to \(targetInterval)s")
-            timer?.invalidate()
-            timer = Timer.scheduledTimer(withTimeInterval: targetInterval, repeats: true) { [weak self] _ in
-                self?.checkConnectionStatus()
-            }
-            RunLoop.current.add(timer!, forMode: .common)
-        }
-        
         Logger.shared.log("Keyboard connected: \(isKeyboardConnected) (was: \(wasKeyboardConnected)), Trackpad connected: \(isTrackpadConnected)")
         
         if isKeyboardConnected && !wasKeyboardConnected {
@@ -101,7 +86,9 @@ class BluetoothAutoConnector: NSObject {
             connectTrackpad()
         } else if !isKeyboardConnected && wasKeyboardConnected {
             wasKeyboardConnected = false
-            Logger.shared.log("EVENT: Keyboard disconnected")
+            Logger.shared.log("EVENT: Keyboard disconnected - triggering trackpad disconnection")
+            delegate?.keyboardDidDisconnect()
+            disconnectTrackpad()
         }
     }
     
@@ -136,6 +123,47 @@ class BluetoothAutoConnector: NSObject {
         
         Logger.shared.log("ERROR: Trackpad not found in paired devices")
         delegate?.trackpadConnectionFailed()
+    }
+    
+    func disconnectTrackpad() {
+        guard let mac = trackpadMAC else {
+            Logger.shared.log("ERROR: No trackpad MAC configured")
+            return
+        }
+        
+        let normalizedMAC = normalizeMAC(mac)
+        Logger.shared.log("Disconnecting trackpad: \(normalizedMAC)")
+        
+        // Find the trackpad device and disconnect using native API
+        let pairedDevices = IOBluetoothDevice.pairedDevices() as? [IOBluetoothDevice] ?? []
+        
+        for device in pairedDevices {
+            if normalizeMAC(device.addressString) == normalizedMAC {
+                Logger.shared.log("Found trackpad: \(device.name ?? "Unknown"), disconnecting...")
+                
+                // Check if already disconnected
+                if !device.isConnected() {
+                    Logger.shared.log("Trackpad already disconnected")
+                    delegate?.trackpadDisconnectedSuccessfully()
+                    return
+                }
+                
+                // Disconnect the device
+                let result = device.closeConnection()
+                
+                if result == kIOReturnSuccess {
+                    Logger.shared.log("SUCCESS: Trackpad disconnected")
+                    delegate?.trackpadDisconnectedSuccessfully()
+                } else {
+                    Logger.shared.log("FAILED: Could not disconnect trackpad (error: \(result))")
+                    delegate?.trackpadDisconnectionFailed()
+                }
+                return
+            }
+        }
+        
+        Logger.shared.log("ERROR: Trackpad not found in paired devices")
+        delegate?.trackpadDisconnectionFailed()
     }
     
     private func attemptConnection(to device: IOBluetoothDevice, retryCount: Int) {
@@ -180,6 +208,9 @@ class BluetoothAutoConnector: NSObject {
 
 protocol BluetoothAutoConnectorDelegate: AnyObject {
     func keyboardDidConnect()
+    func keyboardDidDisconnect()
     func trackpadConnectedSuccessfully()
     func trackpadConnectionFailed()
+    func trackpadDisconnectedSuccessfully()
+    func trackpadDisconnectionFailed()
 }
