@@ -1,4 +1,5 @@
 import Foundation
+import IOBluetooth
 
 class BluetoothAutoConnector: NSObject {
     var keyboardMAC: String?
@@ -48,47 +49,33 @@ class BluetoothAutoConnector: NSObject {
         
         Logger.shared.log("Checking connection status...")
         
-        runBlueutil(args: ["--paired"]) { [weak self] output in
-            guard let self = self else { return }
-            
-            guard let output = output else {
-                Logger.shared.log("ERROR: Failed to get paired devices from blueutil")
-                return
+        // Use native IOBluetooth API instead of blueutil
+        let normalizedTarget = normalizeMAC(keyboardMAC)
+        Logger.shared.log("Looking for keyboard: \(normalizedTarget)")
+        
+        var isConnected = false
+        let pairedDevices = IOBluetoothDevice.pairedDevices() as? [IOBluetoothDevice] ?? []
+        
+        Logger.shared.log("Found \(pairedDevices.count) paired devices")
+        
+        for device in pairedDevices {
+            if normalizeMAC(device.addressString) == normalizedTarget {
+                isConnected = device.isConnected()
+                Logger.shared.log("Found keyboard: \(device.name ?? "Unknown") - connected: \(isConnected)")
+                break
             }
-            
-            Logger.shared.log("Got paired devices list (\(output.count) chars)")
-            
-            let normalizedTarget = keyboardMAC.lowercased().replacingOccurrences(of: ":", with: "-")
-            Logger.shared.log("Looking for keyboard: \(normalizedTarget)")
-            
-            // Parse individual device entries - devices are separated by newlines
-            let deviceEntries = output.components(separatedBy: "\n")
-            var isConnected = false
-            
-            for entry in deviceEntries {
-                let normalizedEntry = entry.lowercased()
-                // Check if this entry contains the target MAC address
-                if normalizedEntry.contains("address: \(normalizedTarget)") {
-                    // Check if this specific device entry indicates it's connected
-                    // Format: "connected (master, 0 dBm)" or "not connected"
-                    isConnected = normalizedEntry.contains("connected (")
-                    Logger.shared.log("Found keyboard entry: \(entry)")
-                    Logger.shared.log("Keyboard connected: \(isConnected)")
-                    break
-                }
-            }
-            
-            Logger.shared.log("Keyboard connected: \(isConnected) (was: \(self.wasKeyboardConnected))")
-            
-            if isConnected && !self.wasKeyboardConnected {
-                self.wasKeyboardConnected = true
-                Logger.shared.log("EVENT: Keyboard connected - triggering trackpad connection")
-                self.delegate?.keyboardDidConnect()
-                self.connectTrackpad()
-            } else if !isConnected && self.wasKeyboardConnected {
-                self.wasKeyboardConnected = false
-                Logger.shared.log("EVENT: Keyboard disconnected")
-            }
+        }
+        
+        Logger.shared.log("Keyboard connected: \(isConnected) (was: \(wasKeyboardConnected))")
+        
+        if isConnected && !wasKeyboardConnected {
+            wasKeyboardConnected = true
+            Logger.shared.log("EVENT: Keyboard connected - triggering trackpad connection")
+            delegate?.keyboardDidConnect()
+            connectTrackpad()
+        } else if !isConnected && wasKeyboardConnected {
+            wasKeyboardConnected = false
+            Logger.shared.log("EVENT: Keyboard disconnected")
         }
     }
     
@@ -98,96 +85,46 @@ class BluetoothAutoConnector: NSObject {
             return
         }
         
-        let normalizedMAC = mac.replacingOccurrences(of: ":", with: "-")
+        let normalizedMAC = normalizeMAC(mac)
         Logger.shared.log("Connecting trackpad: \(normalizedMAC)")
         
-        runBlueutil(args: ["--connect", normalizedMAC]) { [weak self] output in
-            guard let self = self else { return }
-            
-            if let output = output {
-                Logger.shared.log("blueutil connect output: \(output)")
-            } else {
-                Logger.shared.log("ERROR: No output from blueutil connect")
-            }
-            
-            self.runBlueutil(args: ["--paired"]) { output in
-                guard let output = output else {
-                    Logger.shared.log("ERROR: Failed to verify trackpad connection")
-                    self.delegate?.trackpadConnectionFailed()
-                    return
-                }
+        // Find the trackpad device and connect using native API
+        let pairedDevices = IOBluetoothDevice.pairedDevices() as? [IOBluetoothDevice] ?? []
+        
+        for device in pairedDevices {
+            if normalizeMAC(device.addressString) == normalizedMAC {
+                Logger.shared.log("Found trackpad: \(device.name ?? "Unknown"), attempting connection...")
                 
-                let normalizedMAC = mac.lowercased().replacingOccurrences(of: ":", with: "-")
+                // Attempt connection
+                let result = device.openConnection()
                 
-                // Parse individual device entries
-                let deviceEntries = output.components(separatedBy: "\n")
-                var isConnected = false
-                
-                for entry in deviceEntries {
-                    let normalizedEntry = entry.lowercased()
-                    if normalizedEntry.contains("address: \(normalizedMAC)") {
-                        // Format: "connected (master, 0 dBm)" or "not connected"
-                        isConnected = normalizedEntry.contains("connected (")
-                        Logger.shared.log("Found trackpad entry: \(entry)")
-                        Logger.shared.log("Trackpad connected: \(isConnected)")
-                        break
+                if result == kIOReturnSuccess {
+                    // Verify connection
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                        guard let self = self else { return }
+                        
+                        if device.isConnected() {
+                            Logger.shared.log("SUCCESS: Trackpad connected")
+                            self.delegate?.trackpadConnectedSuccessfully()
+                        } else {
+                            Logger.shared.log("FAILED: Trackpad connection attempt completed but not connected")
+                            self.delegate?.trackpadConnectionFailed()
+                        }
                     }
-                }
-                
-                if isConnected {
-                    Logger.shared.log("SUCCESS: Trackpad connected")
-                    self.delegate?.trackpadConnectedSuccessfully()
                 } else {
-                    Logger.shared.log("FAILED: Trackpad not in connected state")
-                    self.delegate?.trackpadConnectionFailed()
+                    Logger.shared.log("FAILED: Could not open connection (error: \(result))")
+                    delegate?.trackpadConnectionFailed()
                 }
+                return
             }
         }
+        
+        Logger.shared.log("ERROR: Trackpad not found in paired devices")
+        delegate?.trackpadConnectionFailed()
     }
     
-    func runBlueutil(args: [String], completion: @escaping (String?) -> Void) {
-        let task = Process()
-        task.launchPath = "/opt/homebrew/bin/blueutil"
-        task.arguments = args
-        
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = pipe
-        
-        Logger.shared.log("Running: blueutil \(args.joined(separator: " "))")
-        
-        do {
-            try task.run()
-            task.waitUntilExit()
-            
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let output = String(data: data, encoding: .utf8)
-            Logger.shared.log("blueutil exit code: \(task.terminationStatus)")
-            completion(output)
-        } catch {
-            Logger.shared.log("blueutil not found at /opt/homebrew/bin, trying /usr/local/bin")
-            
-            let task2 = Process()
-            task2.launchPath = "/usr/local/bin/blueutil"
-            task2.arguments = args
-            
-            let pipe2 = Pipe()
-            task2.standardOutput = pipe2
-            task2.standardError = pipe2
-            
-            do {
-                try task2.run()
-                task2.waitUntilExit()
-                
-                let data = pipe2.fileHandleForReading.readDataToEndOfFile()
-                let output = String(data: data, encoding: .utf8)
-                Logger.shared.log("blueutil (/usr/local) exit code: \(task2.terminationStatus)")
-                completion(output)
-            } catch {
-                Logger.shared.log("ERROR: blueutil not found. Install with: brew install blueutil")
-                completion(nil)
-            }
-        }
+    private func normalizeMAC(_ mac: String) -> String {
+        return mac.lowercased().replacingOccurrences(of: ":", with: "-")
     }
 }
 

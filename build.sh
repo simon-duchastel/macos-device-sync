@@ -22,6 +22,7 @@ swiftc \
     -framework Foundation \
     -framework Cocoa \
     -framework CoreBluetooth \
+    -framework IOBluetooth \
     -framework UserNotifications \
     *.swift
 

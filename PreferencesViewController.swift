@@ -1,4 +1,5 @@
 import Cocoa
+import IOBluetooth
 
 class PreferencesViewController: NSViewController {
     weak var connector: BluetoothAutoConnector!
@@ -143,56 +144,21 @@ class PreferencesViewController: NSViewController {
     @objc func showPairedDevices() {
         infoTextView.string = "Fetching paired devices..."
         
-        // Try first location
-        runBlueutil(at: "/opt/homebrew/bin/blueutil") { [weak self] output, error in
-            guard let self = self else { return }
+        // Use native IOBluetooth API instead of blueutil
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let pairedDevices = IOBluetoothDevice.pairedDevices() as? [IOBluetoothDevice] ?? []
             
-            if let output = output, !output.isEmpty {
-                DispatchQueue.main.async {
-                    self.infoTextView.string = output
-                }
-            } else {
-                // Try second location
-                self.runBlueutil(at: "/usr/local/bin/blueutil") { [weak self] output2, error2 in
-                    guard let self = self else { return }
-                    
-                    DispatchQueue.main.async {
-                        if let output2 = output2, !output2.isEmpty {
-                            self.infoTextView.string = output2
-                        } else {
-                            let errorMsg = error2 ?? error ?? "Unknown error"
-                            self.infoTextView.string = "Error: Could not run blueutil.\n\nError: \(errorMsg)\n\nInstall with: brew install blueutil"
-                        }
-                    }
-                }
+            var output = ""
+            for device in pairedDevices {
+                let address = device.addressString ?? "Unknown"
+                let name = device.name ?? "Unknown"
+                let connected = device.isConnected() ? "connected" : "not connected"
+                output += "address: \(address), \(connected), name: \"\(name)\"\n"
             }
-        }
-    }
-    
-    func runBlueutil(at path: String, completion: @escaping (String?, String?) -> Void) {
-        let task = Process()
-        task.launchPath = path
-        task.arguments = ["--paired"]
-        
-        let pipe = Pipe()
-        task.standardOutput = pipe
-        task.standardError = pipe
-        
-        task.terminationHandler = { process in
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let output = String(data: data, encoding: .utf8)
             
-            if process.terminationStatus == 0 {
-                completion(output, nil)
-            } else {
-                completion(nil, output ?? "Exit code: \(process.terminationStatus)")
+            DispatchQueue.main.async {
+                self?.infoTextView.string = output.isEmpty ? "No paired devices found" : output
             }
-        }
-        
-        do {
-            try task.run()
-        } catch {
-            completion(nil, error.localizedDescription)
         }
     }
     
